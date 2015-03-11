@@ -11,6 +11,13 @@ except ImportError:
 
 __author__ = 'anders-lokans'
 
+# TODO:
+# - move DELAY to class property and add an extra method
+# to set it
+# - Reorganise and refactor code (way too abstract)
+# 
+# 
+# 
 
 DELAY = 0.36
 
