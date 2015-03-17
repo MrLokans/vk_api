@@ -70,6 +70,7 @@ class Vk(object):
             print("Using only public methods.")
 
     def check_settings(self):
+        """Makes sure that settings file always exists"""
         f = self.settings_file
         if not os.path.isfile(f) or os.path.getsize(f) == 0:
             print("No settings file exists, creating.")
@@ -97,6 +98,7 @@ class Vk(object):
         self.settings = self.temp_settings
 
     def get_access_token(self):
+        """Authorizes user"""
         print("You will now be redirected to the authorisation page.")
         print("If you're asked to login - login and copy paste page url when asked.")
         print("Otherwise copy paste page url when asked.")
@@ -110,10 +112,12 @@ class Vk(object):
         self.settings = self.temp_settings
 
     def validate_url(self, url):
+        """Checks whether the correct url is supplied"""
         if "#access_token=" not in url:
             raise ValueError("Wrong URL supplied.")
 
     def parse_token_url(self, url):
+        """Gets access token from supplied url"""
         s = re.search(r'#access_token=([A-Za-z0-9]+)', url)
         if s:
             return s.groups()[0]
@@ -122,6 +126,7 @@ class Vk(object):
             raise Exception("No acces token parsed.")
 
     def api_method(self, method_name, **kwargs):
+        """Implements vk api methods"""
         self.second_time = time.time()
         diff = self.second_time - self.first_time
         if diff < DELAY:
