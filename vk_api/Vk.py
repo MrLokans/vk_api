@@ -34,44 +34,6 @@ permissions = ("friends", "photos", "audio", "video", "status",
                "wall", "messages",)
 
 
-def construct_auth_dialog_url():
-    perms = ",".join(permissions)
-    url = '{}\
-client_id={}&\
-scope={}&\
-redirect_uri={}&\
-display={}&\
-v={}&\
-response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, "https://oauth.vk.com/blank.html", "page", "5.27")
-    return url
-
-
-def open_settings(file_name="settings.json"):
-    d = {}
-    if not os.path.isfile(file_name):
-        print("No settings file exists, creating.")
-        with open(file_name, "w", encoding="utf-8") as f:
-            json.dumps(d, f, indent=4)
-
-
-def get_settings():
-    pass
-
-
-def validate_url(url):
-    if "#access_token=" not in url:
-        raise ValueError("Wrong URL supplied.")
-
-
-def get_access_token(url):
-    s = re.search(r'#access_token=([A-Za-z0-9]+)', url)
-    if s:
-        return s.groups()[0]
-    else:
-        print(s)
-        raise Exception("No acces token parsed.")
-
-
 def json_to_file(data_dict, file_name):
     with open(file_name, "w", encoding="utf-8") as f:
         json.dump(data_dict, f, indent=4)
@@ -90,22 +52,17 @@ class API_Error(Exception):
 class Vk(object):
 
     def __init__(self,
-                 access_token="",
                  vk_version="5.27"):
-        # if not any(login, password, api_key):
-        #     raise Exception("No way to authorise!")
+
         self.default_settings = {"access_token": ""}
         self.settings_file = "settings.json"
         self.check_settings()
 
         self.temp_settings = self.settings
-        # self.settings = {}
         self.first_time = time.time()
         self.second_time = time.time()
-        # self.login = login
-        # self.password = password
+
         self._access_token = ""
-        # self.api_key = api_key
         self.vk_version = vk_version
 
         if not self.access_token:
@@ -143,14 +100,26 @@ class Vk(object):
         print("You will now be redirected to the authorisation page.")
         print("If you're asked to login - login and copy paste page url when asked.")
         print("Otherwise copy paste page url when asked.")
-        url = construct_auth_dialog_url()
+        url = self.construct_auth_dialog_url()
         webbrowser.open_new(url)
         in_url = input("Please, enter URL with access token:")
-        validate_url(in_url)
-        access_token = get_access_token(in_url)
+        self.validate_url(in_url)
+        access_token = self.parse_token_url(in_url)
 
         self.temp_settings["access_token"] = access_token
         self.settings = self.temp_settings
+
+    def validate_url(self, url):
+        if "#access_token=" not in url:
+            raise ValueError("Wrong URL supplied.")
+
+    def parse_token_url(self, url):
+        s = re.search(r'#access_token=([A-Za-z0-9]+)', url)
+        if s:
+            return s.groups()[0]
+        else:
+            print(s)
+            raise Exception("No acces token parsed.")
 
     def api_method(self, method_name, **kwargs):
         self.second_time = time.time()
@@ -165,13 +134,23 @@ class Vk(object):
             kwargs["access_token"] = self.access_token
 
         url = API_BASE_URL + method_name
-        # print(url)
         r = requests.get(url, params=kwargs)
-
         r = r.json()
+
         if "error" in r:
             self.handle_error(r["error"])
         return r
+
+    def construct_auth_dialog_url(self):
+        perms = ",".join(permissions)
+        url = '{}\
+client_id={}&\
+scope={}&\
+redirect_uri={}&\
+display={}&\
+v={}&\
+response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, "https://oauth.vk.com/blank.html", "page", "5.27")
+        return url
 
     def handle_error(self, error_request):
         error_code = error_request["error_code"]
@@ -185,6 +164,7 @@ class Vk(object):
 
 def main():
     vk = Vk()
+    vk.get_access_token()
     print(vk.api_method("friends.get", user_id=1))
 
 if __name__ == "__main__":
