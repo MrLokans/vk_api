@@ -15,9 +15,6 @@ __author__ = 'anders-lokans'
 # - move DELAY to class property and add an extra method
 # to set it
 # - Reorganise and refactor code (way too abstract)
-# 
-# 
-# 
 
 DELAY = 0.36
 
@@ -32,7 +29,8 @@ class Vk(object):
     def __init__(self,
                  login="",
                  password="",
-                 api_key="",):
+                 api_key="",
+                 vk_version="5.27"):
         # if not any(login, password, api_key):
         #     raise Exception("No way to authorise!")
         self.first_time = time.time()
@@ -40,6 +38,7 @@ class Vk(object):
         self.login = login
         self.password = password
         self.api_key = api_key
+        self.vk_version = vk_version
 
         if not self.api_key:
             if self.login and self.password:
@@ -65,25 +64,24 @@ class Vk(object):
         # config.read('settings.cfg')
         # return config.get('user', 'api_key')
 
-    def api_method(self, method_name, vk_version="5.27", **kwargs):
+    def api_method(self, method_name, **kwargs):
         self.second_time = time.time()
         diff = self.second_time - self.first_time
         if diff < DELAY:
             time_to_sleep = DELAY - diff
             time.sleep(time_to_sleep + 0.03)
         self.second_time = time.time()
-        pars = ""
+
         pars = dict(kwargs)
-        if vk_version:
-            pars["v"] = vk_version
-            if self.api_key:
-                pars["access_token"] = self.api_key
-        ready_param = "?".join([method_name, ])
-        url = "".join([API_BASE_URL, ready_param])
+
+        pars["v"] = self.vk_version
+        if self.api_key:
+            pars["access_token"] = self.api_key
+
+        url = API_BASE_URL + method_name
+        print(url)
         r = requests.get(url, params=pars)
 
-        print(r.url)
-        # r = json.loads(r.text)
         r = r.json()
         if "error" in r:
             self.handle_error(r["error"])
@@ -97,3 +95,11 @@ class Vk(object):
             raise Exception("Could not authorise! Captcha Needed.")
         else:
             raise Exception("Unknown Error. {message}".format(message=error_request["error_msg"]))
+
+
+def main():
+    vk = Vk()
+    print(vk.api_method("friends.get", user_id="100000"))
+
+if __name__ == "__main__":
+    main()
