@@ -1,7 +1,9 @@
 import time
 import requests
 import json
-
+import webbrowser
+import re
+import os
 # from vars import app_token
 
 try:
@@ -12,57 +14,143 @@ except ImportError:
 __author__ = 'anders-lokans'
 
 # TODO:
-# - move DELAY to class property and add an extra method
+# (+) move DELAY to class property and add an extra method
 # to set it
 # - Reorganise and refactor code (way too abstract)
+# (+) add user authorisation
+# (+) add access token settings
 
 DELAY = 0.36
 
 app_token = ""
 API_BASE_URL = "https://api.vk.com/method/"
+AUTH_BASE_URL = "https://oauth.vk.com/authorize?"
+APP_ID = "4169750"
 AUTH_ERROR_CODE = 5
 CAPTCHA_ERROR_CODE = 14
+
+
+permissions = ("friends", "photos", "audio", "video", "status",
+               "wall", "messages",)
+
+
+def construct_auth_dialog_url():
+    perms = ",".join(permissions)
+    url = '{}\
+client_id={}&\
+scope={}&\
+redirect_uri={}&\
+display={}&\
+v={}&\
+response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, "https://oauth.vk.com/blank.html", "page", "5.27")
+    return url
+
+
+def open_settings(file_name="settings.json"):
+    d = {}
+    if not os.path.isfile(file_name):
+        print("No settings file exists, creating.")
+        with open(file_name, "w", encoding="utf-8") as f:
+            json.dumps(d, f, indent=4)
+
+
+def get_settings():
+    pass
+
+
+def validate_url(url):
+    if "#access_token=" not in url:
+        raise ValueError("Wrong URL supplied.")
+
+
+def get_access_token(url):
+    s = re.search(r'#access_token=([A-Za-z0-9]+)', url)
+    if s:
+        return s.groups()[0]
+    else:
+        print(s)
+        raise Exception("No acces token parsed.")
+
+
+def json_to_file(data_dict, file_name):
+    with open(file_name, "w", encoding="utf-8") as f:
+        json.dump(data_dict, f, indent=4)
+
+
+def json_from_file(file_name):
+    with open(file_name, "r", encoding="utf-8") as f_in:
+        data = json.load(f_in)
+    return data
+
+
+class API_Error(Exception):
+    pass
 
 
 class Vk(object):
 
     def __init__(self,
-                 login="",
-                 password="",
-                 api_key="",
+                 access_token="",
                  vk_version="5.27"):
         # if not any(login, password, api_key):
         #     raise Exception("No way to authorise!")
+        self.default_settings = {"access_token": ""}
+        self.settings_file = "settings.json"
+        self.check_settings()
+
+        self.temp_settings = self.settings
+        # self.settings = {}
         self.first_time = time.time()
         self.second_time = time.time()
-        self.login = login
-        self.password = password
-        self.api_key = api_key
+        # self.login = login
+        # self.password = password
+        self._access_token = ""
+        # self.api_key = api_key
         self.vk_version = vk_version
 
-        if not self.api_key:
-            if self.login and self.password:
-                self.api_key = self.get_api_key(login, password)
+        if not self.access_token:
+            print("No access token provided.")
+            print("Using only public methods.")
 
-        if not any([login, password, api_key]):
-            # if app_token:
-            #     self.api_key = self.get_settings_token()
-            # else:
-            print("Could not authorise. Using only public methods.")
+    def check_settings(self):
+        f = self.settings_file
+        if not os.path.isfile(f) or os.path.getsize(f) == 0:
+            print("No settings file exists, creating.")
+            print("Defaults:", self.default_settings)
+            json_to_file(self.default_settings, f)
 
-    def get_api_key(self, login, password):
-        """
-        TODO: implement authorisation
-        """
-        self.api_key = self.api_key
-        api_key = "aaaaaaaaaaaaaaaaaaaa"
-        return api_key
+    @property
+    def settings(self):
+        return json_from_file(self.settings_file)
 
-    def get_settings_token(self):
-        return app_token
-        # config = Config_Parser.ConfigParser()
-        # config.read('settings.cfg')
-        # return config.get('user', 'api_key')
+    @settings.setter
+    def settings(self, value):
+        json_to_file(value, self.settings_file)
+
+    @property
+    def access_token(self):
+        t = self.settings["access_token"]
+        self._access_token = t
+        return t
+
+    @access_token.setter
+    def access_token(self, value):
+        self._access_token = value
+        self.temp_settings["access_token"] = value
+        self.settings = self.temp_settings
+
+    def get_access_token(self):
+        print("You will now be redirected to the authorisation page.")
+        print("If you're asked to login - login and copy paste page url when asked.")
+        print("Otherwise copy paste page url when asked.")
+        url = construct_auth_dialog_url()
+        webbrowser.open_new(url)
+        in_url = input("Please, enter URL with access token:")
+        validate_url(in_url)
+        access_token = get_access_token(in_url)
+
+        self.temp_settings["access_token"] = access_token
+        self.settings = self.temp_settings
 
     def api_method(self, method_name, **kwargs):
         self.second_time = time.time()
@@ -72,15 +160,13 @@ class Vk(object):
             time.sleep(time_to_sleep + 0.03)
         self.second_time = time.time()
 
-        pars = dict(kwargs)
-
-        pars["v"] = self.vk_version
-        if self.api_key:
-            pars["access_token"] = self.api_key
+        kwargs["v"] = self.vk_version
+        if self.access_token:
+            kwargs["access_token"] = self.access_token
 
         url = API_BASE_URL + method_name
-        print(url)
-        r = requests.get(url, params=pars)
+        # print(url)
+        r = requests.get(url, params=kwargs)
 
         r = r.json()
         if "error" in r:
@@ -90,16 +176,16 @@ class Vk(object):
     def handle_error(self, error_request):
         error_code = error_request["error_code"]
         if error_code == AUTH_ERROR_CODE:
-            raise Exception("Could not authorise! Invalid Session.")
+            raise API_Error("Could not authorise! Invalid Session.")
         elif error_code == CAPTCHA_ERROR_CODE:
-            raise Exception("Could not authorise! Captcha Needed.")
+            raise API_Error("Could not authorise! Captcha Needed.")
         else:
-            raise Exception("Unknown Error. {message}".format(message=error_request["error_msg"]))
+            raise API_Error("Unknown Error. {message}".format(message=error_request["error_msg"]))
 
 
 def main():
     vk = Vk()
-    print(vk.api_method("friends.get", user_id="100000"))
+    print(vk.api_method("friends.get", user_id=1))
 
 if __name__ == "__main__":
     main()
