@@ -14,11 +14,13 @@ except ImportError:
 __author__ = 'anders-lokans'
 
 # TODO:
-# (+) move DELAY to class property and add an extra method
+# (-) move DELAY to class property
+# and add an extra method
 # to set it
-# - Reorganise and refactor code (way too abstract)
 # (+) add user authorisation
 # (+) add access token settings
+# (-) Cover with tests
+# (-) Make base class that handles all the routines?
 
 DELAY = 0.36
 
@@ -28,10 +30,6 @@ AUTH_BASE_URL = "https://oauth.vk.com/authorize?"
 APP_ID = "4169750"
 AUTH_ERROR_CODE = 5
 CAPTCHA_ERROR_CODE = 14
-
-
-permissions = ("friends", "photos", "audio", "video", "status",
-               "wall", "messages",)
 
 
 def json_to_file(data_dict, file_name):
@@ -51,6 +49,9 @@ class API_Error(Exception):
 
 class Vk(object):
 
+    permissions = ("friends", "photos", "audio", "video", "status",
+                   "wall", "messages",)
+
     def __init__(self,
                  vk_version="5.27"):
 
@@ -64,6 +65,7 @@ class Vk(object):
 
         self._access_token = ""
         self.vk_version = vk_version
+
 
         if not self.access_token:
             print("No access token provided.")
@@ -147,7 +149,7 @@ class Vk(object):
         return r
 
     def construct_auth_dialog_url(self):
-        perms = ",".join(permissions)
+        perms = ",".join(Vk.permissions)
         url = '{}\
 client_id={}&\
 scope={}&\
