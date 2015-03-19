@@ -127,6 +127,14 @@ class Vk(object):
             print(s)
             raise Exception("No acces token parsed.")
 
+    def is_valid_access_token(self):
+        is_valid = True
+        try:
+            self.api_method("isAppUser")
+        except API_Error:
+            is_valid = False
+        return is_valid
+
     def api_method(self, method_name, **kwargs):
         """Implements vk api methods"""
         self.second_time = time.time()
@@ -160,6 +168,10 @@ response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, "https://oauth.vk.com/
         return url
 
     def handle_error(self, error_request):
+        # TODO:
+        # (-) Add actual handlers
+        # (-) Somehow download and solve captcha
+        # (-) May be move method ErrorHadnler Class
         error_code = error_request["error_code"]
         if error_code == AUTH_ERROR_CODE:
             raise API_Error("Could not authorise! Invalid Session.")
@@ -171,8 +183,8 @@ response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, "https://oauth.vk.com/
 
 def main():
     vk = Vk()
-    vk.get_access_token()
-    print(vk.api_method("friends.get", user_id=1))
+    print(vk.is_valid_access_token())
+    print(vk.api_method("wall.get", user_id="1"))
 
 if __name__ == "__main__":
     main()
