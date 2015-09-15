@@ -7,8 +7,10 @@ import os
 # from vars import app_token
 
 try:
+    # Python 2
     import ConfigParser as Config_Parser
 except ImportError:
+    # Python 3
     import configparser as Config_Parser
 
 __author__ = 'anders-lokans'
@@ -30,6 +32,7 @@ AUTH_BASE_URL = "https://oauth.vk.com/authorize?"
 APP_ID = "4169750"
 AUTH_ERROR_CODE = 5
 CAPTCHA_ERROR_CODE = 14
+CAPTCHA_ENTER_RETRIES = 3
 
 
 def json_to_file(data_dict, file_name):
@@ -44,6 +47,10 @@ def json_from_file(file_name):
 
 
 class API_Error(Exception):
+    pass
+
+
+class API_Captcha_Error(Exception):
     pass
 
 
@@ -65,7 +72,6 @@ class Vk(object):
 
         self._access_token = ""
         self.vk_version = vk_version
-
 
         if not self.access_token:
             print("No access token provided.")
@@ -150,13 +156,14 @@ class Vk(object):
 
         url = API_BASE_URL + method_name
         r = requests.get(url, params=kwargs)
+        self.last_method_url = r.url
         r = r.json()
-
         if "error" in r:
-            self.handle_error(r["error"])
+            return self.handle_error(r["error"])
         return r
 
     def construct_auth_dialog_url(self):
+        """Constructs url to get the access token"""
         perms = ",".join(Vk.permissions)
         url = '{}\
 client_id={}&\
@@ -167,16 +174,32 @@ v={}&\
 response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, "https://oauth.vk.com/blank.html", "page", "5.27")
         return url
 
+    def handle_captcha(self, req):
+        captcha_url = req["captcha_img"]
+        captcha_sid = req["captcha_sid"]
+        print("Now your browser will be opened with captcha:")
+        webbrowser.open_new(captcha_url)
+        while True:
+            captcha_solution = input("Please, enter recognized image:")
+            new_method_url = "{}&captcha_sid={}&captcha_key={}".format(self.last_method_url,
+                                                                       captcha_sid,
+                                                                       captcha_solution)
+            r = requests.get(new_method_url)
+            if "error" not in r:
+                self.last_method_url = new_method_url
+                return r.json()
+            raise API_Captcha_Error("Wrong captcha supplied!")
+
     def handle_error(self, error_request):
         # TODO:
-        # (-) Add actual handlers
-        # (-) Somehow download and solve captcha
+        # (+) Add actual handlers
+        # (-) Somehow download and solve captcha (add some GUI)
         # (-) May be move method ErrorHadnler Class
         error_code = error_request["error_code"]
         if error_code == AUTH_ERROR_CODE:
             raise API_Error("Could not authorise! Invalid Session.")
         elif error_code == CAPTCHA_ERROR_CODE:
-            raise API_Error("Could not authorise! Captcha Needed.")
+            return self.handle_captcha(error_request)
         else:
             raise API_Error("Unknown Error. {message}".format(message=error_request["error_msg"]))
 
