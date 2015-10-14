@@ -23,7 +23,6 @@ __author__ = 'anders-lokans'
 # (+) add access token settings
 # (-) Cover with tests
 # (-) Make base class that handles all the routines?
-
 DELAY = 0.36
 
 app_token = ""
@@ -76,6 +75,19 @@ class Vk(object):
         if not self.access_token:
             print("No access token provided.")
             print("Using only public methods.")
+
+    @staticmethod
+    def from_login_pass(login, password):
+        """
+        :param login: login string
+        :param password: password string
+        :return: api object
+        """
+        pass
+
+    @staticmethod
+    def from_access_token(access_token):
+        pass
 
     def check_settings(self):
         """Makes sure that settings file always exists"""
