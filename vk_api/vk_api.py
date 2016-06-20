@@ -42,6 +42,7 @@ APP_ID = "4169750"
 AUTH_ERROR_CODE = 5
 CAPTCHA_ERROR_CODE = 14
 CAPTCHA_ENTER_RETRIES = 3
+DEFAULT_API_VERSION = "5.52"
 
 
 def get_exception_class_by_code(code):
@@ -77,7 +78,7 @@ class API(object):
                    "wall", "messages",)
 
     def __init__(self,
-                 vk_version="5.27",
+                 vk_version=DEFAULT_API_VERSION,
                  request_delay=DELAY):
 
         self.default_settings = {"access_token": ""}
@@ -239,9 +240,8 @@ response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, "https://oauth.vk.com/
 
 def main():
     api = API()
-    get_exception_class_by_code(1)
     print("Has valid access token: ", api.is_valid_access_token())
-    print(api.api_method("wall.get", user_id="1"))
+    print(api.api_method("wall.get", owner_id="1"))
 
 if __name__ == "__main__":
     main()
