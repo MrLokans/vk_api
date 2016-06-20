@@ -1,0 +1,8 @@
+build/*
+
+
+dist/*
+vk_api.egg-info/*
+
+**/*.pyc
+.idea/*

@@ -1,9 +1,15 @@
+from __future__ import print_function, unicode_literals
+
 import time
 import requests
 import json
 import webbrowser
 import re
 import os
+
+import logging
+
+logging.basicConfig(level=logging.INFO)
 # from vars import app_token
 
 try:
@@ -53,13 +59,14 @@ class API_Captcha_Error(Exception):
     pass
 
 
-class Vk(object):
+class API(object):
 
     permissions = ("friends", "photos", "audio", "video", "status",
                    "wall", "messages",)
 
     def __init__(self,
-                 vk_version="5.27"):
+                 vk_version="5.27",
+                 request_delay=DELAY):
 
         self.default_settings = {"access_token": ""}
         self.settings_file = "settings.json"
@@ -71,10 +78,11 @@ class Vk(object):
 
         self._access_token = ""
         self.vk_version = vk_version
+        self.delay = request_delay
 
         if not self.access_token:
-            print("No access token provided.")
-            print("Using only public methods.")
+            logging.warn("No access token provided.")
+            logging.warn("Using only public methods.")
 
     @staticmethod
     def from_login_pass(login, password):
@@ -93,8 +101,7 @@ class Vk(object):
         """Makes sure that settings file always exists"""
         f = self.settings_file
         if not os.path.isfile(f) or os.path.getsize(f) == 0:
-            print("No settings file exists, creating.")
-            print("Defaults:", self.default_settings)
+            logging.info("Settings file does not exist, creating.")
             json_to_file(self.default_settings, f)
 
     @property
@@ -176,7 +183,7 @@ class Vk(object):
 
     def construct_auth_dialog_url(self):
         """Constructs url to get the access token"""
-        perms = ",".join(Vk.permissions)
+        perms = ",".join(API.permissions)
         url = '{}\
 client_id={}&\
 scope={}&\
@@ -217,9 +224,9 @@ response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, "https://oauth.vk.com/
 
 
 def main():
-    vk = Vk()
-    print(vk.is_valid_access_token())
-    print(vk.api_method("wall.get", user_id="1"))
+    api = API()
+    print(api.is_valid_access_token())
+    print(api.api_method("wall.get", user_id="1"))
 
 if __name__ == "__main__":
     main()
