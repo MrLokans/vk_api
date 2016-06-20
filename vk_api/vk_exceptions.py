@@ -2,14 +2,18 @@ class API_Error(Exception):
     pass
 
 
-class UnknownError(Exception):
+class IncorrectAccessToken(Exception):
+    pass
+
+
+class UnknownError(API_Error):
     error_code = 1
     error_msg = """
 Unknown error occurred. Try again later.
 """
 
 
-class ApplicationDisabledError(Exception):
+class ApplicationDisabledError(API_Error):
     error_code = 2
     error_msg = """
 Application is disabled. Enable your application or use test mode
