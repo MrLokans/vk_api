@@ -19,6 +19,10 @@ except ImportError:
     # Python 3
     import configparser as Config_Parser
 
+
+import vk_api.vk_exceptions as vk_exceptions
+from .vk_exceptions import API_Error, CaptchaNeededError, UnknownError, UserAuthorizationError
+
 __author__ = 'anders-lokans'
 
 # TODO:
@@ -40,6 +44,22 @@ CAPTCHA_ERROR_CODE = 14
 CAPTCHA_ENTER_RETRIES = 3
 
 
+def get_exception_class_by_code(code):
+    """Gets exception with the corresponding error code,
+    otherwise returns UnknownError"""
+    code = int(code)
+
+    api_error_classes = {}
+    for e in vk_exceptions.__dict__.keys():
+        err_cls = vk_exceptions.__dict__[e]
+        if not e.endswith('Error'):
+            continue
+        if not hasattr(err_cls, 'error_code'):
+            continue
+        api_error_classes[int(err_cls.error_code)] = err_cls
+    return api_error_classes.get(code, UnknownError)
+
+
 def json_to_file(data_dict, file_name):
     with open(file_name, "w", encoding="utf-8") as f:
         json.dump(data_dict, f, indent=4)
@@ -49,14 +69,6 @@ def json_from_file(file_name):
     with open(file_name, "r", encoding="utf-8") as f_in:
         data = json.load(f_in)
     return data
-
-
-class API_Error(Exception):
-    pass
-
-
-class API_Captcha_Error(Exception):
-    pass
 
 
 class API(object):
@@ -149,7 +161,6 @@ class API(object):
         if s:
             return s.groups()[0]
         else:
-            print(s)
             raise Exception("No acces token parsed.")
 
     def is_valid_access_token(self):
@@ -207,7 +218,7 @@ response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, "https://oauth.vk.com/
             if "error" not in r:
                 self.last_method_url = new_method_url
                 return r.json()
-            raise API_Captcha_Error("Wrong captcha supplied!")
+            raise CaptchaNeededError("Wrong captcha supplied!")
 
     def handle_error(self, error_request):
         # TODO:
@@ -216,16 +227,20 @@ response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, "https://oauth.vk.com/
         # (-) May be move method ErrorHadnler Class
         error_code = error_request["error_code"]
         if error_code == AUTH_ERROR_CODE:
-            raise API_Error("Could not authorise! Invalid Session.")
+            raise UserAuthorizationError("Could not authorise! Invalid Session.")
         elif error_code == CAPTCHA_ERROR_CODE:
             return self.handle_captcha(error_request)
         else:
-            raise API_Error("Unknown Error. {message}".format(message=error_request["error_msg"]))
+            err_msg = "Error code {}\n".format(error_code)
+            err_cls = get_exception_class_by_code(error_code)
+            err_msg += err_cls.error_msg
+            raise err_cls(err_msg)
 
 
 def main():
     api = API()
-    print(api.is_valid_access_token())
+    get_exception_class_by_code(1)
+    print("Has valid access token: ", api.is_valid_access_token())
     print(api.api_method("wall.get", user_id="1"))
 
 if __name__ == "__main__":
