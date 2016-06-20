@@ -76,7 +76,7 @@ class API(object):
                    "wall", "messages",)
 
     def __init__(self,
-                 vk_version=DEFAULT_API_VERSION,
+                 api_version=DEFAULT_API_VERSION,
                  request_delay=DELAY):
 
         self.default_settings = {"access_token": ""}
@@ -88,7 +88,7 @@ class API(object):
         self.second_time = time.time()
 
         self._access_token = ""
-        self.vk_version = vk_version
+        self.api_version = api_version
         self.delay = request_delay
 
         if not self.access_token:
@@ -179,7 +179,7 @@ class API(object):
             time.sleep(time_to_sleep + 0.03)
         self.second_time = time.time()
 
-        kwargs["v"] = self.vk_version
+        kwargs["v"] = self.api_version
         if self.access_token:
             kwargs["access_token"] = self.access_token
 
@@ -197,10 +197,10 @@ class API(object):
         url = '{}\
 client_id={}&\
 scope={}&\
-redirect_uri={}&\
-display={}&\
+redirect_uri=https://oauth.vk.com/blank.html&\
+display=page&\
 v={}&\
-response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, "https://oauth.vk.com/blank.html", "page", "5.27")
+response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, self.api_version)
         return url
 
     def handle_captcha(self, req):
