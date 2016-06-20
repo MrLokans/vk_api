@@ -19,9 +19,7 @@ except ImportError:
     # Python 3
     import configparser as Config_Parser
 
-
-import vk_api.vk_exceptions as vk_exceptions
-from .vk_exceptions import API_Error, CaptchaNeededError, UnknownError, UserAuthorizationError
+from . import vk_exceptions
 
 __author__ = 'anders-lokans'
 
@@ -58,7 +56,7 @@ def get_exception_class_by_code(code):
         if not hasattr(err_cls, 'error_code'):
             continue
         api_error_classes[int(err_cls.error_code)] = err_cls
-    return api_error_classes.get(code, UnknownError)
+    return api_error_classes.get(code, vk_exceptions.UnknownError)
 
 
 def json_to_file(data_dict, file_name):
@@ -162,13 +160,13 @@ class API(object):
         if s:
             return s.groups()[0]
         else:
-            raise Exception("No acces token parsed.")
+            raise vk_exceptions.IncorrectAccessToken("No acces token parsed.")
 
     def is_valid_access_token(self):
         is_valid = True
         try:
             self.api_method("isAppUser")
-        except API_Error:
+        except vk_exceptions.API_Error:
             is_valid = False
         return is_valid
 
@@ -219,7 +217,7 @@ response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, "https://oauth.vk.com/
             if "error" not in r:
                 self.last_method_url = new_method_url
                 return r.json()
-            raise CaptchaNeededError("Wrong captcha supplied!")
+            raise vk_exceptions.CaptchaNeededError("Wrong captcha supplied!")
 
     def handle_error(self, error_request):
         # TODO:
@@ -227,9 +225,7 @@ response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, "https://oauth.vk.com/
         # (-) Somehow download and solve captcha (add some GUI)
         # (-) May be move method ErrorHadnler Class
         error_code = error_request["error_code"]
-        if error_code == AUTH_ERROR_CODE:
-            raise UserAuthorizationError("Could not authorise! Invalid Session.")
-        elif error_code == CAPTCHA_ERROR_CODE:
+        if error_code == CAPTCHA_ERROR_CODE:
             return self.handle_captcha(error_request)
         else:
             err_msg = "Error code {}\n".format(error_code)
