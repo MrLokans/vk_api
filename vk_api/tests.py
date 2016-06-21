@@ -1,5 +1,5 @@
+import re
 import unittest
-from unittest.mock import patch
 
 import httpretty
 
@@ -61,6 +61,16 @@ class TestAPI(unittest.TestCase):
         api = API()
         with self.assertRaises(vk_exceptions.MissingOrInvalidParameterError):
             api.api_method('wall.get')
+
+    @httpretty.activate
+    def test_access_token_added_to_requests_when_present(self):
+        httpretty.register_uri(httpretty.GET,
+                               re.compile(r"https://api.vk.com/method/wall.get*"),
+                               body='{"response": [1, {}]}',
+                               headers={'content-type': 'text/json', })
+        api = API(access_token="accesstoken")
+        api.api_method('wall.get')
+        self.assertIn("access_token=accesstoken", httpretty.last_request().path)
 
 
 if __name__ == '__main__':
