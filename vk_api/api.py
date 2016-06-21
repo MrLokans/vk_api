@@ -39,7 +39,9 @@ APP_ID = "4169750"
 AUTH_ERROR_CODE = 5
 CAPTCHA_ERROR_CODE = 14
 CAPTCHA_ENTER_RETRIES = 3
+DEFAULT_SETTINGS_FILE = "settings.json"
 DEFAULT_API_VERSION = "5.52"
+DEFAULT_SETTINGS = {"access_token": ""}
 
 
 def get_exception_class_by_code(code):
@@ -59,11 +61,26 @@ def get_exception_class_by_code(code):
 
 
 def json_to_file(data_dict, file_name):
+    """
+    Dump python dictionary to json file
+    :param data_dict: python dictionary to be dumped
+    :type data_dict: dict
+    :param file_name: filepath to dump data to
+    :type file_name: str
+    """
     with open(file_name, "w", encoding="utf-8") as f:
         json.dump(data_dict, f, indent=4)
 
 
 def json_from_file(file_name):
+    """Read data from file and return as dict,
+    if any exception occurs - return empty dict
+    :param file_name: filepath to dump data to
+    :type file_name: str
+    :return: dictionary with data from json file
+    :rtype: dict
+    """
+    data = {}
     with open(file_name, "r", encoding="utf-8") as f_in:
         data = json.load(f_in)
     return data
@@ -75,24 +92,26 @@ class API(object):
                    "wall", "messages",)
 
     def __init__(self,
+                 access_token=None,
+                 use_settings=False,
+                 settings_file=None,
                  api_version=DEFAULT_API_VERSION,
                  request_delay=API_CALL_DELAY):
 
-        self.default_settings = {"access_token": ""}
-        self.settings_file = "settings.json"
-        self.check_settings()
+        self._use_settings = use_settings
+        self._access_token = access_token
+        if self._use_settings:
+            self._settings_file = settings_file if settings_file else DEFAULT_SETTINGS_FILE
+        self.manage_settings()
 
         self.temp_settings = self.settings
         self.first_time = time.time()
-        self.second_time = time.time()
 
-        self._access_token = ""
         self.api_version = api_version
         self.delay = request_delay
 
-        if not self.access_token:
-            logging.warn("No access token provided.")
-            logging.warn("Using only public methods.")
+        if not self._access_token:
+            logging.info("No access token provided, using public methods.")
 
     @staticmethod
     def from_login_pass(login, password):
@@ -103,36 +122,43 @@ class API(object):
         """
         pass
 
-    @staticmethod
-    def from_access_token(access_token):
-        pass
-
-    def check_settings(self):
+    def manage_settings(self):
         """Makes sure that settings file always exists"""
-        f = self.settings_file
-        if not os.path.isfile(f) or os.path.getsize(f) == 0:
-            logging.info("Settings file does not exist, creating.")
-            json_to_file(self.default_settings, f)
+        if not self._use_settings:
+            return
+        f = self._settings_file
+        if not os.path.exists(f) or not os.path.isfile(f):
+            # Write empty settings if no file present
+            json_to_file(DEFAULT_SETTINGS, f)
+        if not self._access_token:
+            # We try to get access token from settings file
+            d = json_from_file(self._settings_file)
+            if d.get('access_token'):
+                self._access_token = d.get('access_token')
 
     @property
     def settings(self):
-        return json_from_file(self.settings_file)
+        if self._use_settings:
+            return json_from_file(self._settings_file)
+        return {}
 
     @settings.setter
     def settings(self, value):
-        json_to_file(value, self.settings_file)
+        if self._use_settings:
+            json_to_file(value, self._settings_file)
 
     @property
     def access_token(self):
-        t = self.settings["access_token"]
-        self._access_token = t
-        return t
+        # t = self.settings["access_token"]
+        # self._access_token = t
+        # return t
+        return self._access_token
 
     @access_token.setter
     def access_token(self, value):
         self._access_token = value
-        self.temp_settings["access_token"] = value
-        self.settings = self.temp_settings
+        # self.temp_settings["access_token"] = value
+        # self.settings = self.temp_settings
 
     def get_access_token(self):
         """Authorizes user"""
@@ -181,18 +207,17 @@ class API(object):
         """
         # Calculate time difference between requests
         # and prohibit API calls in single-threaded environment
-        self.second_time = time.time()
-        request_time_diff = self.second_time - self.first_time
+        second_time = time.time()
+        request_time_diff = second_time - self.first_time
         if request_time_diff < API_CALL_DELAY:
             time_to_sleep = API_CALL_DELAY - request_time_diff
-            time.sleep(time_to_sleep + 0.03)
-        self.second_time = time.time()
+            time.sleep(time_to_sleep + 0.01)
 
         request_api_version = kwargs.get('v')
         if not request_api_version:
             kwargs["v"] = self.api_version
-        if self.access_token:
-            kwargs["access_token"] = self.access_token
+        if self._access_token:
+            kwargs["access_token"] = self._access_token
 
         url = API_BASE_URL + method_name
         r = requests.get(url, params=kwargs)
@@ -221,9 +246,8 @@ response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, self.api_version)
         webbrowser.open_new(captcha_url)
         while True:
             captcha_solution = input("Please, enter recognized image:")
-            new_method_url = "{}&captcha_sid={}&captcha_key={}".format(self.last_method_url,
-                                                                       captcha_sid,
-                                                                       captcha_solution)
+            args = (self.last_method_url, captcha_sid, captcha_solution)
+            new_method_url = "{}&captcha_sid={}&captcha_key={}".format(*args)
             r = requests.get(new_method_url)
             if "error" not in r:
                 self.last_method_url = new_method_url
