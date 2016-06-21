@@ -9,8 +9,6 @@ import os
 
 import logging
 
-logging.basicConfig(level=logging.INFO)
-# from vars import app_token
 
 try:
     # Python 2
@@ -21,17 +19,18 @@ except ImportError:
 
 from . import vk_exceptions
 
-__author__ = 'anders-lokans'
+logging.basicConfig(level=logging.INFO)
+
 
 # TODO:
-# (-) move DELAY to class property
+# (-) move API_CALL_DELAY to class property
 # and add an extra method
 # to set it
 # (+) add user authorisation
 # (+) add access token settings
 # (-) Cover with tests
 # (-) Make base class that handles all the routines?
-DELAY = 0.36
+API_CALL_DELAY = 0.36
 
 app_token = ""
 API_BASE_URL = "https://api.vk.com/method/"
@@ -77,7 +76,7 @@ class API(object):
 
     def __init__(self,
                  api_version=DEFAULT_API_VERSION,
-                 request_delay=DELAY):
+                 request_delay=API_CALL_DELAY):
 
         self.default_settings = {"access_token": ""}
         self.settings_file = "settings.json"
@@ -171,15 +170,27 @@ class API(object):
         return is_valid
 
     def api_method(self, method_name, **kwargs):
-        """Implements vk api methods"""
+        """Low-level implementation of API calls.
+        >>>api = API()
+        >>>api.api_method("wall.get", owner_id="1", offset=20, count=30))
+        :param method_name: name of the VK API method to be called
+        :type method_name: str or unicode
+        :param **kwargs: method parameters passed to method
+        :returns: api response dictionary
+        :rtype: dictionary
+        """
+        # Calculate time difference between requests
+        # and prohibit API calls in single-threaded environment
         self.second_time = time.time()
-        diff = self.second_time - self.first_time
-        if diff < DELAY:
-            time_to_sleep = DELAY - diff
+        request_time_diff = self.second_time - self.first_time
+        if request_time_diff < API_CALL_DELAY:
+            time_to_sleep = API_CALL_DELAY - request_time_diff
             time.sleep(time_to_sleep + 0.03)
         self.second_time = time.time()
 
-        kwargs["v"] = self.api_version
+        request_api_version = kwargs.get('v')
+        if not request_api_version:
+            kwargs["v"] = self.api_version
         if self.access_token:
             kwargs["access_token"] = self.access_token
 
@@ -223,7 +234,6 @@ response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, self.api_version)
         # TODO:
         # (+) Add actual handlers
         # (-) Somehow download and solve captcha (add some GUI)
-        # (-) May be move method ErrorHadnler Class
         error_code = error_request["error_code"]
         if error_code == CAPTCHA_ERROR_CODE:
             return self.handle_captcha(error_request)
@@ -237,7 +247,7 @@ response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, self.api_version)
 def main():
     api = API()
     print("Has valid access token: ", api.is_valid_access_token())
-    print(api.api_method("wall.get", owner_id="1"))
+    print(api.api_method("wall.get", owner_id="1", offset=20, count=30))
 
 if __name__ == "__main__":
     main()
