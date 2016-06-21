@@ -42,6 +42,8 @@ CAPTCHA_ENTER_RETRIES = 3
 DEFAULT_SETTINGS_FILE = "settings.json"
 DEFAULT_API_VERSION = "5.52"
 DEFAULT_SETTINGS = {"access_token": ""}
+DEFAULT_PERMISSIONS = ("friends", "photos", "audio", "video", "status",
+                       "wall", "messages",)
 
 
 def get_exception_class_by_code(code):
@@ -96,7 +98,8 @@ class API(object):
                  use_settings=False,
                  settings_file=None,
                  api_version=DEFAULT_API_VERSION,
-                 request_delay=API_CALL_DELAY):
+                 request_delay=API_CALL_DELAY,
+                 permissions=DEFAULT_PERMISSIONS):
 
         self._use_settings = use_settings
         self._access_token = access_token
@@ -109,6 +112,7 @@ class API(object):
 
         self.api_version = api_version
         self.delay = request_delay
+        self.permissions = permissions
 
         if not self._access_token:
             logging.info("No access token provided, using public methods.")
@@ -229,7 +233,7 @@ class API(object):
 
     def construct_auth_dialog_url(self):
         """Constructs url to get the access token"""
-        perms = ",".join(API.permissions)
+        perms = ",".join(self.permissions)
         url = '{}\
 client_id={}&\
 scope={}&\
