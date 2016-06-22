@@ -9,14 +9,6 @@ import os
 
 import logging
 
-
-try:
-    # Python 2
-    import ConfigParser as Config_Parser
-except ImportError:
-    # Python 3
-    import configparser as Config_Parser
-
 from . import vk_exceptions
 
 logging.basicConfig(level=logging.INFO)
@@ -269,13 +261,19 @@ response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, self.api_version)
             err_msg = "Error code {}\n".format(error_code)
             err_cls = get_exception_class_by_code(error_code)
             err_msg += err_cls.error_msg
+            err_msg += error_request['error_msg']
             raise err_cls(err_msg)
 
 
 def main():
-    api = API()
+    api = API(use_settings=True)
     print("Has valid access token: ", api.is_valid_access_token())
     print(api.api_method("wall.get", owner_id="1", offset=20, count=30))
+    code = """
+var friends = API.friends.get({"user_id": 1});
+return friends;
+"""
+    print(api.api_method("execute", code=code))
 
 if __name__ == "__main__":
     main()
