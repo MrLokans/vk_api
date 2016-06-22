@@ -40,7 +40,10 @@ DEFAULT_PERMISSIONS = ("friends", "photos", "audio", "video", "status",
 
 def get_exception_class_by_code(code):
     """Gets exception with the corresponding error code,
-    otherwise returns UnknownError"""
+    otherwise returns UnknownError
+    :param code: error code
+    :type code: int
+    """
     code = int(code)
 
     api_error_classes = {}
@@ -99,8 +102,8 @@ class API(object):
             self._settings_file = settings_file if settings_file else DEFAULT_SETTINGS_FILE
         self.manage_settings()
 
-        self.temp_settings = self.settings
         self.first_time = time.time()
+        self._called_first_time = True
 
         self.api_version = api_version
         self.delay = request_delay
@@ -108,15 +111,6 @@ class API(object):
 
         if not self._access_token:
             logging.info("No access token provided, using public methods.")
-
-    @staticmethod
-    def from_login_pass(login, password):
-        """
-        :param login: login string
-        :param password: password string
-        :return: api object
-        """
-        pass
 
     def manage_settings(self):
         """Makes sure that settings file always exists"""
@@ -132,56 +126,54 @@ class API(object):
             if d.get('access_token'):
                 self._access_token = d.get('access_token')
 
-    @property
-    def settings(self):
-        if self._use_settings:
-            return json_from_file(self._settings_file)
-        return {}
+    @classmethod
+    def get_access_token(cls,
+                         permissions=DEFAULT_PERMISSIONS,
+                         api_version=DEFAULT_API_VERSION,
+                         app_id=APP_ID):
+        """
+        Obtain access token from the user with given permissions.
+        User is prompted to copy URL from his browser containing access-token.
+        Access token itself is NOT copied to the library owner or any 3rdparties
 
-    @settings.setter
-    def settings(self, value):
-        if self._use_settings:
-            json_to_file(value, self._settings_file)
+        :param permissions: sequence of permissions_ names access_token should provide
+        :param api_version: version of VK API.
+        :param app_id: application ID
+        :type permissions: tuple
+        :type api_version: str or unicode
+        :type app_id: str or unicode
+        :return: access token
+        :rtype: str or unicode
 
-    @property
-    def access_token(self):
-        # t = self.settings["access_token"]
-        # self._access_token = t
-        # return t
-        return self._access_token
-
-    @access_token.setter
-    def access_token(self, value):
-        self._access_token = value
-        # self.temp_settings["access_token"] = value
-        # self.settings = self.temp_settings
-
-    def get_access_token(self):
-        """Authorizes user"""
+        .. _permissions: https://new.vk.com/dev/permissions
+        """
         print("You will now be redirected to the authorisation page.")
         print("If you're asked to login - login and copy paste page url when asked.")
         print("Otherwise copy paste page url when asked.")
-        url = self.construct_auth_dialog_url()
+        url = cls.construct_auth_dialog_url(permissions=permissions,
+                                             api_version=api_version,
+                                             app_id=app_id)
         webbrowser.open_new(url)
         in_url = input("Please, enter URL with access token:")
-        self.validate_url(in_url)
-        access_token = self.parse_token_url(in_url)
+        access_token = cls.parse_token_url(in_url)
+        return access_token
 
-        self.temp_settings["access_token"] = access_token
-        self.settings = self.temp_settings
 
-    def validate_url(self, url):
-        """Checks whether the correct url is supplied"""
-        if "#access_token=" not in url:
-            raise ValueError("Wrong URL supplied.")
+    @classmethod
+    def parse_token_url(cls, url):
+        """Extracts access token from the specified url,
+        if there is no token - raises IncorrectAccessToken error.
 
-    def parse_token_url(self, url):
-        """Gets access token from supplied url"""
+        :param url: URL string to extract access token from
+        :type url: str or unicode
+        :return: Access token string
+        :rtype: str or unicode
+        """
         s = re.search(r'#access_token=([A-Za-z0-9]+)', url)
         if s:
             return s.groups()[0]
         else:
-            raise vk_exceptions.IncorrectAccessToken("No acces token parsed.")
+            raise vk_exceptions.IncorrectAccessToken("No access token found in url.")
 
     def is_valid_access_token(self):
         is_valid = True
@@ -193,21 +185,30 @@ class API(object):
 
     def api_method(self, method_name, **kwargs):
         """Low-level implementation of API calls.
-        >>>api = API()
-        >>>api.api_method("wall.get", owner_id="1", offset=20, count=30))
-        :param method_name: name of the VK API method to be called
+        Usage example:
+
+        >>> api = API()
+        >>> api.api_method("wall.get", owner_id="1", offset=20, count=30))
+
+        :param method_name: name of the VK API method_ to be called
         :type method_name: str or unicode
-        :param **kwargs: method parameters passed to method
+        :param kwargs: method parameters passed to method
         :returns: api response dictionary
         :rtype: dictionary
+
+        .. _method: https://new.vk.com/dev/methods
         """
+
         # Calculate time difference between requests
         # and prohibit API calls in single-threaded environment
         second_time = time.time()
         request_time_diff = second_time - self.first_time
         if request_time_diff < API_CALL_DELAY:
-            time_to_sleep = API_CALL_DELAY - request_time_diff
-            time.sleep(time_to_sleep + 0.01)
+            if not self._called_first_time:
+                time_to_sleep = API_CALL_DELAY - request_time_diff
+                time.sleep(time_to_sleep + 0.01)
+            else:
+                self._called_first_time = True
 
         request_api_version = kwargs.get('v')
         if not request_api_version:
@@ -223,16 +224,31 @@ class API(object):
             return self.handle_error(r["error"])
         return r
 
-    def construct_auth_dialog_url(self):
-        """Constructs url to get the access token"""
-        perms = ",".join(self.permissions)
+    @staticmethod
+    def construct_auth_dialog_url(permissions=DEFAULT_PERMISSIONS,
+                                  api_version=DEFAULT_API_VERSION,
+                                  app_id=APP_ID):
+        """Constructs url to get the access token
+
+        :param permissions: sequence of permissions_ names access_token should provide
+        :param api_version: version of VK API.
+        :param app_id: application ID
+        :type permissions: tuple
+        :type api_version: str or unicode
+        :type app_id: str or unicode
+        :return: URL to obtain user's access token with given permissions
+        :rtype: str or unicode
+
+        .. _permissions: https://new.vk.com/dev/permissions
+        """
+        perms = ",".join(permissions)
         url = '{}\
 client_id={}&\
 scope={}&\
 redirect_uri=https://oauth.vk.com/blank.html&\
 display=page&\
 v={}&\
-response_type=token'.format(AUTH_BASE_URL, APP_ID, perms, self.api_version)
+response_type=token'.format(AUTH_BASE_URL, app_id, perms, api_version)
         return url
 
     def handle_captcha(self, req):
@@ -274,6 +290,7 @@ var friends = API.friends.get({"user_id": 1});
 return friends;
 """
     print(api.api_method("execute", code=code))
+    print(api.construct_auth_dialog_url)
 
 if __name__ == "__main__":
     main()
