@@ -112,6 +112,16 @@ class API(object):
         if not self._access_token:
             logging.info("No access token provided, using public methods.")
 
+    @property
+    def access_token(self):
+        return self._access_token
+
+    @access_token.setter
+    def access_token(self, value):
+        self._access_token = value
+        if self._use_settings and self._settings_file:
+            json_to_file({"access_token": value}, self._settings_file)
+
     def manage_settings(self):
         """Makes sure that settings file always exists"""
         if not self._use_settings:
@@ -157,7 +167,6 @@ class API(object):
         in_url = input("Please, enter URL with access token:")
         access_token = cls.parse_token_url(in_url)
         return access_token
-
 
     @classmethod
     def parse_token_url(cls, url):
