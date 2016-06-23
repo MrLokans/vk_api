@@ -3,7 +3,7 @@ import unittest
 
 import httpretty
 
-from .api import get_exception_class_by_code, API
+from .api import API
 from . import vk_exceptions
 
 
@@ -16,12 +16,12 @@ class TestExceptions(unittest.TestCase):
             (500, vk_exceptions.VotesPermissionError)
         ]
         for err_code, exc_class in correspondencies:
-            expected_class = get_exception_class_by_code(err_code)
+            expected_class = vk_exceptions.get_exception_class_by_code(err_code)
             self.assertEqual(exc_class, expected_class,
                              msg="Incorrect exception class returned.")
 
     def test_correct_exception_class_returned_by_nonexistent_error_code(self):
-        exception_class = get_exception_class_by_code(999999999999)
+        exception_class = vk_exceptions.get_exception_class_by_code(999999999999)
         self.assertEqual(vk_exceptions.UnknownError, exception_class,
                          msg="UnknownError should be returned if error code does not exist.")
 

@@ -1,8 +1,51 @@
+import sys
+import inspect
+
+
+def is_valid_error_cls(cls):
+    """
+    Check whether the supplied object is valid VK API error
+    exception class.
+    :param cls: Class object to be checked
+    :rtype: bool
+    """
+    valid_name = cls.__name__.endswith('Error')
+    valid_attrs = hasattr(cls, 'error_code')
+    return valid_name and valid_attrs
+
+
+def get_exception_class_by_code(code):
+    """Gets exception with the corresponding error code,
+    otherwise returns UnknownError
+    :param code: error code
+    :type code: int
+    :return: Return Exception class associated with the specified API error.
+    """
+    code = int(code)
+
+    module_classes = inspect.getmembers(sys.modules[__name__], inspect.isclass)
+    exception_classes = (h[1] for h in module_classes
+                         if is_valid_error_cls(h[1]))
+
+    exception_cls = None
+    for e_c in exception_classes:
+        if e_c.error_code == code:
+            exception_cls = e_c
+            break
+    if exception_cls is None:
+        exception_cls = UnknownError
+    return exception_cls
+
+
 class API_Error(Exception):
     pass
 
 
 class IncorrectAccessToken(Exception):
+    pass
+
+
+class IncorrectErrorResponse(Exception):
     pass
 
 
