@@ -10,32 +10,12 @@ import os
 import logging
 
 from . import vk_exceptions
+from . import conf
 
 logging.basicConfig(level=logging.INFO)
 
 
-# TODO:
-# (-) move API_CALL_DELAY to class property
-# and add an extra method
-# to set it
-# (+) add user authorisation
-# (+) add access token settings
-# (-) Cover with tests
-# (-) Make base class that handles all the routines?
-API_CALL_DELAY = 0.36
-
 app_token = ""
-API_BASE_URL = "https://api.vk.com/method/"
-AUTH_BASE_URL = "https://oauth.vk.com/authorize?"
-APP_ID = "4169750"
-AUTH_ERROR_CODE = 5
-CAPTCHA_ERROR_CODE = 14
-CAPTCHA_ENTER_RETRIES = 3
-DEFAULT_SETTINGS_FILE = "settings.json"
-DEFAULT_API_VERSION = "5.52"
-DEFAULT_SETTINGS = {"access_token": ""}
-DEFAULT_PERMISSIONS = ("friends", "photos", "audio", "video", "status",
-                       "wall", "messages",)
 
 
 def get_exception_class_by_code(code):
@@ -92,14 +72,14 @@ class API(object):
                  access_token=None,
                  use_settings=False,
                  settings_file=None,
-                 api_version=DEFAULT_API_VERSION,
-                 request_delay=API_CALL_DELAY,
-                 permissions=DEFAULT_PERMISSIONS):
+                 api_version=conf.DEFAULT_API_VERSION,
+                 request_delay=conf.API_CALL_DELAY,
+                 permissions=conf.DEFAULT_PERMISSIONS):
 
         self._use_settings = use_settings
         self._access_token = access_token
         if self._use_settings:
-            self._settings_file = settings_file if settings_file else DEFAULT_SETTINGS_FILE
+            self._settings_file = settings_file if settings_file else conf.DEFAULT_SETTINGS_FILE
         self.manage_settings()
 
         self.first_time = time.time()
@@ -129,7 +109,7 @@ class API(object):
         f = self._settings_file
         if not os.path.exists(f) or not os.path.isfile(f):
             # Write empty settings if no file present
-            json_to_file(DEFAULT_SETTINGS, f)
+            json_to_file(conf.DEFAULT_SETTINGS, f)
         if not self._access_token:
             # We try to get access token from settings file
             d = json_from_file(self._settings_file)
@@ -138,9 +118,9 @@ class API(object):
 
     @classmethod
     def get_access_token(cls,
-                         permissions=DEFAULT_PERMISSIONS,
-                         api_version=DEFAULT_API_VERSION,
-                         app_id=APP_ID):
+                         permissions=conf.DEFAULT_PERMISSIONS,
+                         api_version=conf.DEFAULT_API_VERSION,
+                         app_id=conf.APP_ID):
         """
         Obtain access token from the user with given permissions.
         User is prompted to copy URL from his browser containing access-token.
@@ -212,9 +192,9 @@ class API(object):
         # and prohibit API calls in single-threaded environment
         second_time = time.time()
         request_time_diff = second_time - self.first_time
-        if request_time_diff < API_CALL_DELAY:
+        if request_time_diff < conf.API_CALL_DELAY:
             if not self._called_first_time:
-                time_to_sleep = API_CALL_DELAY - request_time_diff
+                time_to_sleep = conf.API_CALL_DELAY - request_time_diff
                 time.sleep(time_to_sleep + 0.01)
             else:
                 self._called_first_time = True
@@ -225,7 +205,7 @@ class API(object):
         if self._access_token:
             kwargs["access_token"] = self._access_token
 
-        url = API_BASE_URL + method_name
+        url = conf.API_BASE_URL + method_name
         r = requests.get(url, params=kwargs)
         self.last_method_url = r.url
         r = r.json()
@@ -234,9 +214,9 @@ class API(object):
         return r
 
     @staticmethod
-    def construct_auth_dialog_url(permissions=DEFAULT_PERMISSIONS,
-                                  api_version=DEFAULT_API_VERSION,
-                                  app_id=APP_ID):
+    def construct_auth_dialog_url(permissions=conf.DEFAULT_PERMISSIONS,
+                                  api_version=conf.DEFAULT_API_VERSION,
+                                  app_id=conf.APP_ID):
         """Constructs url to get the access token
 
         :param permissions: sequence of permissions_ names access_token should provide
@@ -257,7 +237,7 @@ scope={}&\
 redirect_uri=https://oauth.vk.com/blank.html&\
 display=page&\
 v={}&\
-response_type=token'.format(AUTH_BASE_URL, app_id, perms, api_version)
+response_type=token'.format(conf.AUTH_BASE_URL, app_id, perms, api_version)
         return url
 
     def handle_captcha(self, req):
@@ -280,7 +260,7 @@ response_type=token'.format(AUTH_BASE_URL, app_id, perms, api_version)
         # (+) Add actual handlers
         # (-) Somehow download and solve captcha (add some GUI)
         error_code = error_request["error_code"]
-        if error_code == CAPTCHA_ERROR_CODE:
+        if error_code == conf.CAPTCHA_ERROR_CODE:
             return self.handle_captcha(error_request)
         else:
             err_msg = "Error code {}\n".format(error_code)
