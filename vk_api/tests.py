@@ -1,9 +1,10 @@
 import re
 import unittest
+from unittest.mock import patch
 
 import httpretty
 
-from .api import API
+from .api import API, process_error_response
 from . import vk_exceptions
 
 
@@ -24,6 +25,11 @@ class TestExceptions(unittest.TestCase):
         exception_class = vk_exceptions.get_exception_class_by_code(999999999999)
         self.assertEqual(vk_exceptions.UnknownError, exception_class,
                          msg="UnknownError should be returned if error code does not exist.")
+
+    def test_incorrect_response_error_text_raises_exception(self):
+        incorrect_error_response = {"some": "random data"}
+        with self.assertRaises(vk_exceptions.IncorrectErrorResponse):
+            process_error_response(None, incorrect_error_response)
 
 
 class TestAPIAuth(unittest.TestCase):
@@ -70,8 +76,79 @@ class TestAPI(unittest.TestCase):
                                headers={'content-type': 'text/json', })
         api = API(access_token="accesstoken")
         api.api_method('wall.get')
-        self.assertIn("access_token=accesstoken", httpretty.last_request().path)
+        self.assertIn("access_token=accesstoken",
+                      httpretty.last_request().path)
 
+    def test_api_token_returned_with_property(self):
+        access_token = "testtoken"
+        api = API(access_token=access_token)
+        self.assertEqual(api.access_token, access_token)
+
+    @patch('vk_api.api.API.manage_settings')
+    @patch('vk_api.utils.json_to_file')
+    def test_api_token_is_written_to_file(self, json_to_file_mock,
+                                          manage_settings_mock):
+        access_token = "testtoken"
+        settings_file = "test_settings.json"
+        api = API(use_settings=True, settings_file=settings_file)
+        api.access_token = access_token
+        print(json_to_file_mock.called_with)
+        json_to_file_mock.assert_called_with({'access_token': access_token},
+                                             settings_file)
+
+    @patch('os.path.isfile')
+    @patch('os.path.exists')
+    @patch('vk_api.utils.json_from_file')
+    def test_access_token_is_read_from_settings_file(self,
+                                                     json_from_file_mock,
+                                                     exists_mock, isfile_mock):
+        settings_file = "test_settings.json"
+        access_token = "testtoken"
+        exists_mock.return_value = True
+        isfile_mock.return_value = True
+        json_from_file_mock.return_value = {"access_token": access_token}
+
+        api = API(use_settings=True, settings_file=settings_file)
+        self.assertEqual(api.access_token, access_token)
+
+    @patch('os.path.isfile')
+    @patch('os.path.exists')
+    @patch('vk_api.utils.json_to_file')
+    def test_settings_are_written_to_non_existent_file(self,
+                                                       json_to_file_mock,
+                                                       exists_mock,
+                                                       isfile_mock):
+        settings_file = "test_settings.json"
+        exists_mock.return_value = False
+        isfile_mock.return_value = False
+        API(use_settings=True, settings_file=settings_file)
+        json_to_file_mock.assert_called_with({'access_token': ''},
+                                             settings_file)
+
+    @patch('os.path.isfile')
+    @patch('os.path.exists')
+    @patch('vk_api.utils.json_to_file')
+    def test_default_settings_are_written_to_non_existent_file(self,
+                                                               json_to_file_mock,
+                                                               exists_mock,
+                                                               isfile_mock):
+        settings_file = "test_settings.json"
+        access_token = "testtoken"
+        exists_mock.return_value = False
+        isfile_mock.return_value = False
+        API(use_settings=True, settings_file=settings_file,
+            access_token=access_token)
+        json_to_file_mock.assert_called_with({'access_token': access_token},
+                                             settings_file)
+
+    def test_auth_url_is_constructed_correctly(self):
+        url = "https://oauth.vk.com/"
+        url += "authorize?client_id=100&scope=wall,friends"
+        url += "&redirect_uri=https://oauth.vk.com/blank.html"
+        url += "&display=page&v=5.00&response_type=token"
+        self.assertEqual(url,
+                         API.construct_auth_dialog_url(("wall", "friends"),
+                                                       "5.00", "100"))
 
 if __name__ == '__main__':
     unittest.main()

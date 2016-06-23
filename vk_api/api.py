@@ -87,7 +87,11 @@ class API(object):
         f = self._settings_file
         if not os.path.exists(f) or not os.path.isfile(f):
             # Write empty settings if no file present
-            utils.json_to_file(conf.DEFAULT_SETTINGS, f)
+            if not self._access_token:
+                utils.json_to_file(conf.DEFAULT_SETTINGS, f)
+            else:
+                utils.json_to_file({"access_token": self._access_token}, f)
+            return
         if not self._access_token:
             # We try to get access token from settings file
             d = utils.json_from_file(self._settings_file)
