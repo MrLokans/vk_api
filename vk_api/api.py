@@ -2,7 +2,6 @@ from __future__ import print_function, unicode_literals
 
 import time
 import requests
-import json
 import webbrowser
 import re
 import os
@@ -10,6 +9,7 @@ import os
 import logging
 
 from . import conf
+from . import utils
 from . import vk_exceptions
 from .import errorhandlers
 
@@ -17,32 +17,6 @@ logging.basicConfig(level=logging.INFO)
 
 
 app_token = ""
-
-
-def json_to_file(data_dict, file_name):
-    """
-    Dump python dictionary to json file
-    :param data_dict: python dictionary to be dumped
-    :type data_dict: dict
-    :param file_name: filepath to dump data to
-    :type file_name: str
-    """
-    with open(file_name, "w", encoding="utf-8") as f:
-        json.dump(data_dict, f, indent=4)
-
-
-def json_from_file(file_name):
-    """Read data from file and return as dict,
-    if any exception occurs - return empty dict
-    :param file_name: filepath to dump data to
-    :type file_name: str
-    :return: dictionary with data from json file
-    :rtype: dict
-    """
-    data = {}
-    with open(file_name, "r", encoding="utf-8") as f_in:
-        data = json.load(f_in)
-    return data
 
 
 def process_error_response(vk, json_response):
@@ -104,7 +78,7 @@ class API(object):
     def access_token(self, value):
         self._access_token = value
         if self._use_settings and self._settings_file:
-            json_to_file({"access_token": value}, self._settings_file)
+            utils.json_to_file({"access_token": value}, self._settings_file)
 
     def manage_settings(self):
         """Makes sure that settings file always exists"""
@@ -113,10 +87,10 @@ class API(object):
         f = self._settings_file
         if not os.path.exists(f) or not os.path.isfile(f):
             # Write empty settings if no file present
-            json_to_file(conf.DEFAULT_SETTINGS, f)
+            utils.json_to_file(conf.DEFAULT_SETTINGS, f)
         if not self._access_token:
             # We try to get access token from settings file
-            d = json_from_file(self._settings_file)
+            d = utils.json_from_file(self._settings_file)
             if d.get('access_token'):
                 self._access_token = d.get('access_token')
 
