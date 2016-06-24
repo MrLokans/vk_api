@@ -49,7 +49,7 @@ class TestAPIAuth(unittest.TestCase):
             self.assertEqual(API().parse_token_url(u), expected_token)
 
 
-class TestAPI(unittest.TestCase):
+class TestAPImethods(unittest.TestCase):
 
     @httpretty.activate
     def test_api_request_url_is_correctly_formed(self):
@@ -95,7 +95,6 @@ class TestAPI(unittest.TestCase):
         settings_file = "test_settings.json"
         api = API(use_settings=True, settings_file=settings_file)
         api.access_token = access_token
-        print(json_to_file_mock.called_with)
         json_to_file_mock.assert_called_with({'access_token': access_token},
                                              settings_file)
 
@@ -152,6 +151,29 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(url,
                          API.construct_auth_dialog_url(("wall", "friends"),
                                                        "5.00", "100"))
+
+    @patch('vk_api.api.API.api_method')
+    def test_simple_dot_method_works(self, api_method_mock):
+        api = API()
+        code = "return;"
+        api.execute(code=code)
+        api_method_mock.assert_called_with('execute', code=code)
+
+    @httpretty.activate
+    def test_compound_methods_are_correctly_parsed(self):
+        api = API()
+        httpretty.register_uri(httpretty.GET,
+                               re.compile(r"https://api.vk.com/method/wall.get*"),
+                               body='{"response": [1, {}]}',
+                               headers={'content-type': 'text/json', })
+        r = api.wall.get(owner_id=1)
+        self.assertEqual(r["response"][0], 1)
+
+
+    class TestBunchContextManager(unittest.TestCase):
+
+        def test_basic_usage(self):
+            pass
 
 if __name__ == '__main__':
     unittest.main()
