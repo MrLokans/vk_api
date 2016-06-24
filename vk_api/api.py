@@ -16,9 +16,6 @@ from .import errorhandlers
 logging.basicConfig(level=logging.INFO)
 
 
-app_token = ""
-
-
 def process_error_response(vk, json_response):
     """
     When response with error code is returned it is processed
@@ -39,6 +36,35 @@ def process_error_response(vk, json_response):
 
     error_handler = errorhandlers.get_handler_by_error_code(error_code)
     error_handler(vk, json_response).handle()
+
+
+class MethodChunk(object):
+
+    __slots__ = ("_name", "_api", "_parent")
+
+    def __init__(self, name, api, parent=None):
+        self._name = name
+        self._api = api
+        self._parent = parent
+
+    def resolve_method_name(self):
+        """Assembles full method name from parent names"""
+        name_parts = []
+        node = self
+        while isinstance(node, MethodChunk):
+            name_parts.append(node._name)
+            node = node._parent
+        method_name = ".".join(reversed(name_parts))
+        return method_name
+
+    def __call__(self, **kwargs):
+        method_name = self.resolve_method_name()
+        return self._api.api_method(method_name, **kwargs)
+
+    def __getattr__(self, attr):
+        if attr not in self.__slots__:
+            return MethodChunk(attr, self._api, self)
+        return object.__getattr__(self, attr)
 
 
 class API(object):
@@ -223,18 +249,18 @@ v={}&\
 response_type=token'.format(conf.AUTH_BASE_URL, app_id, perms, api_version)
         return url
 
+    def __getattr__(self, attr):
+        if attr in conf.METHOD_DOMAINS:
+            return MethodChunk(attr, api=self)
+        return object.__getattr__(self, attr)
+
 
 
 def main():
-    api = API(use_settings=True)
+    api = API(use_settings=False)
     print("Has valid access token: ", api.is_valid_access_token())
     print(api.api_method("wall.get", owner_id="1", offset=20, count=30))
-    code = """
-var friends = API.friends.get({"user_id": 1});
-return friends;
-"""
-    print(api.api_method("execute", code=code))
-    print(api.construct_auth_dialog_url)
+    print(api.wall.get(owner_id=1, offset=20, count=30))
 
 if __name__ == "__main__":
     main()

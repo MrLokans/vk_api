@@ -11,3 +11,10 @@ DEFAULT_PERMISSIONS = ("friends", "photos", "audio", "video", "status",
 
 AUTH_ERROR_CODE = 5
 CAPTCHA_ERROR_CODE = 14
+
+METHOD_DOMAINS = {"users", "auth", "wall", "photos", "friends", "widgets",
+                  "storage", "status", "audio", "pages", "groups", "board",
+                  "video", "notes", "places", "account", "messages",
+                  "newsfeed", "likes", "polls", "docs", "fave",
+                  "notifications", "stats", "search", "apps", "utils",
+                  "database", "gifts", "execute", "market"}
