@@ -25,6 +25,7 @@ It is possible to make either unauthorized or authorized requests.
 >>> from vk_api.api import API
 >>> api = API()
 >>> api.api_method('wall.get', owner_id=1)
+>>> api.wall.get(owner_id=1, offset=20, count=30)
 ```
 
 **Authorized requests**
