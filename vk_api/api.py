@@ -14,6 +14,7 @@ from . import vk_exceptions
 from .import errorhandlers
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("requests").setLevel(logging.WARNING)
 
 
 def process_error_response(vk, json_response):
@@ -69,9 +70,6 @@ class MethodChunk(object):
 
 class API(object):
 
-    permissions = ("friends", "photos", "audio", "video", "status",
-                   "wall", "messages",)
-
     def __init__(self,
                  access_token=None,
                  use_settings=False,
@@ -94,7 +92,7 @@ class API(object):
         self.permissions = permissions
 
         if not self._access_token:
-            logging.info("No access token provided, using public methods.")
+            logging.debug("No access token provided, using public methods.")
 
     @property
     def access_token(self):
