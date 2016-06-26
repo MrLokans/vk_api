@@ -255,12 +255,54 @@ response_type=token'.format(conf.AUTH_BASE_URL, app_id, perms, api_version)
         return object.__getattr__(self, attr)
 
 
+    def upload_photos_to_user_album(self, album_id,
+                                    group_id="",
+                                    images=None):
+        """Uploads specified image files to the specified album"""
+        # TODO: if number of image files is greater then MAXIMUM number
+        # call upload function multiple times
+        if not images:
+            return
+        for i in images:
+            assert os.path.exists(i) and os.path.isfile(i)
+        if len(images) > conf.MAX_UPLOAD_IMAGES:
+            msg = "Sending more than {} image files is now allowed."
+            print(msg.format(conf.MAX_UPLOAD_IMAGES))
+            return
+        if group_id:
+            upload_url_resp = self.photos.getUploadServer(album_id=album_id,
+                                                          group_id=group_id)
+        else:
+            upload_url_resp = self.photos.getUploadServer(album_id=album_id)
+
+        upload_url = upload_url_resp['response']['upload_url']
+
+        img_files = [open(f, 'rb') for f in images]
+        img_data = {'file{}'.format(i): f for i, f in enumerate(img_files)}
+
+        r = requests.post(upload_url, files=img_data)
+        [i.close() for i in img_files]
+        r = r.json()
+        if group_id:
+            self.photos.save(server=r['server'],
+                             photos_list=r['photos_list'],
+                             hash=r['hash'],
+                             album_id=album_id,
+                             group_id=group_id)
+        else:
+            self.photos.save(server=r['server'],
+                             photos_list=r['photos_list'],
+                             hash=r['hash'],
+                             album_id=album_id)
+
 
 def main():
-    api = API(use_settings=False)
-    print("Has valid access token: ", api.is_valid_access_token())
+    api = API(use_settings=True)
     print(api.api_method("wall.get", owner_id="1", offset=20, count=30))
-    print(api.wall.get(owner_id=1, offset=20, count=30))
+    album_id = "230262951"
+    img_file = os.path.abspath("img.jpg")
+    api.upload_photos_to_user_album(album_id=album_id, images=[img_file, ])
+
 
 if __name__ == "__main__":
     main()
