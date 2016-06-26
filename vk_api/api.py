@@ -254,7 +254,6 @@ response_type=token'.format(conf.AUTH_BASE_URL, app_id, perms, api_version)
             return MethodChunk(attr, api=self)
         return object.__getattr__(self, attr)
 
-
     def upload_photos_to_user_album(self, album_id,
                                     group_id="",
                                     images=None):
@@ -265,9 +264,9 @@ response_type=token'.format(conf.AUTH_BASE_URL, app_id, perms, api_version)
             return
         for i in images:
             assert os.path.exists(i) and os.path.isfile(i)
-        if len(images) > conf.MAX_UPLOAD_IMAGES:
+        if len(images) > conf.MAX_ALBUM_UPLOAD_IMAGES:
             msg = "Sending more than {} image files is now allowed."
-            print(msg.format(conf.MAX_UPLOAD_IMAGES))
+            print(msg.format(conf.MAX_ALBUM_UPLOAD_IMAGES))
             return
         if group_id:
             upload_url_resp = self.photos.getUploadServer(album_id=album_id,
@@ -294,6 +293,18 @@ response_type=token'.format(conf.AUTH_BASE_URL, app_id, perms, api_version)
                              photos_list=r['photos_list'],
                              hash=r['hash'],
                              album_id=album_id)
+
+    def upload_profile_photo(self, photo, profile_id):
+        upload_url_resp = self.photos.getOwnerPhotoUploadServer(owner_id=profile_id)
+        upload_url = upload_url_resp['response']['upload_url']
+        # TODO: handle _square_crop params
+        assert os.path.exists(photo) and os.path.isfile(photo)
+        img_data = {'photo': open(photo, 'rb')}
+        r = requests.post(upload_url, files=img_data)
+        r = r.json()
+        self.photos.saveOwnerPhoto(server=r['server'],
+                                   hash=r['hash'],
+                                   photo=r['photo'])
 
 
 def main():
